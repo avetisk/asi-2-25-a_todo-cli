@@ -1,40 +1,69 @@
 import { readFileSync, writeFileSync } from "node:fs"
 
 const DB_PATH = "./db.json"
+const readDatabase = () => {
+  const json = readFileSync(DB_PATH, { encoding: "utf-8" })
+
+  return JSON.parse(json)
+}
+const writeDatabase = (db) => {
+  const json = JSON.stringify(db)
+
+  writeFileSync(DB_PATH, json, { encoding: "utf-8" })
+}
 const formatTodo = (description, index) => `[${index}] ${description}`
 const printTodo = (description, index) =>
   console.log(formatTodo(description, index))
 const [commandName, ...args] = process.argv.slice(2)
+const commands = {
+  add: (rawDescription) => {
+    const description = rawDescription.trim()
 
-if (commandName === "add") {
-  const description = args[0].trim()
+    if (!description) {
+      console.error("Error: missing description argument")
+      process.exit(2)
+    }
 
-  if (!description) {
-    console.error("Error: missing description argument")
-    process.exit(2)
-  }
+    const todos = readDatabase()
+    const newTodos = [...todos, description]
+    const index = newTodos.length - 1
 
-  const json = readFileSync(DB_PATH, { encoding: "utf-8" })
-  const todos = JSON.parse(json)
-  const newTodos = [...todos, description]
-  const newJson = JSON.stringify(newTodos)
+    writeDatabase(newTodos)
+    printTodo(description, index)
 
-  writeFileSync(DB_PATH, newJson, { encoding: "utf-8" })
+    process.exit(0)
+  },
+  list: () => {
+    const todos = readDatabase()
 
-  const index = newTodos.length - 1
+    todos.forEach(printTodo)
+    process.exit(0)
+  },
+  delete: (rawIndex) => {
+    const index = Number.parseInt(rawIndex, 10)
+    const todos = readDatabase()
+    const todo = todos[index]
 
-  printTodo(description, index)
+    if (!todo) {
+      console.error(
+        `Error: missing or invalid index (must be 0-${todos.length - 1})`
+      )
+      process.exit(2)
+    }
 
-  process.exit(0)
+    const newTodos = todos.filter((_, i) => i !== index)
+
+    writeDatabase(newTodos)
+    printTodo(todo, index)
+
+    process.exit(0)
+  },
+}
+const command = commands[commandName]
+
+if (!command) {
+  console.error("Error: command not found")
+  process.exit(1)
 }
 
-if (commandName === "list") {
-  const json = readFileSync(DB_PATH, { encoding: "utf-8" })
-  const todos = JSON.parse(json)
-
-  todos.forEach(printTodo)
-  process.exit(0)
-}
-
-console.error("Error: command not found")
-process.exit(1)
+command(...args)

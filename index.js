@@ -1,15 +1,12 @@
-import { readFileSync, writeFileSync } from "node:fs"
+import { readFile, writeFile } from "node:fs/promises"
 
 const DB_PATH = "./db.json"
-const readDatabase = () => {
-  const json = readFileSync(DB_PATH, { encoding: "utf-8" })
-
-  return JSON.parse(json)
-}
+const readDatabase = () =>
+  readFile(DB_PATH, { encoding: "utf-8" }).then((json) => JSON.parse(json))
 const writeDatabase = (db) => {
   const json = JSON.stringify(db)
 
-  writeFileSync(DB_PATH, json, { encoding: "utf-8" })
+  return writeFile(DB_PATH, json, { encoding: "utf-8" })
 }
 const formatTodo = (description, index) => `[${index}] ${description}`
 const printTodo = (description, index) =>
@@ -24,39 +21,48 @@ const commands = {
       process.exit(2)
     }
 
-    const todos = readDatabase()
-    const newTodos = [...todos, description]
-    const index = newTodos.length - 1
+    readDatabase()
+      .then((todos) => {
+        const newTodos = [...todos, description]
+        const index = newTodos.length - 1
 
-    writeDatabase(newTodos)
-    printTodo(description, index)
+        printTodo(description, index)
 
-    process.exit(0)
+        return writeDatabase(newTodos)
+      })
+      .then(() => {
+        process.exit(0)
+      })
   },
   list: () => {
-    const todos = readDatabase()
-
-    todos.forEach(printTodo)
-    process.exit(0)
+    readDatabase().then((todos) => {
+      todos.forEach(printTodo)
+      process.exit(0)
+    })
   },
   delete: (rawIndex) => {
     const index = Number.parseInt(rawIndex, 10)
-    const todos = readDatabase()
-    const todo = todos[index]
 
-    if (!todo) {
-      console.error(
-        `Error: missing or invalid index (must be 0-${todos.length - 1})`
-      )
-      process.exit(2)
-    }
+    readDatabase()
+      .then((todos) => {
+        const todo = todos[index]
 
-    const newTodos = todos.filter((_, i) => i !== index)
+        if (!todo) {
+          console.error(
+            `Error: missing or invalid index (must be 0-${todos.length - 1})`
+          )
+          process.exit(2)
+        }
 
-    writeDatabase(newTodos)
-    printTodo(todo, index)
+        const newTodos = todos.filter((_, i) => i !== index)
 
-    process.exit(0)
+        printTodo(todo, index)
+
+        return writeDatabase(newTodos)
+      })
+      .then(() => {
+        process.exit(0)
+      })
   },
 }
 const command = commands[commandName]
